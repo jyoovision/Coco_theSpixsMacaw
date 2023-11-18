@@ -1,0 +1,37 @@
+# RVC
+__pycache__
+/TEMP
+
+# Unreal Engine 5
+CapstoneProject_v01/Binaries/
+CapstoneProject_v01/DerivedDataCache/
+CapstoneProject_v01/Intermediate/
+CapstoneProject_v01/Saved/
+CapstoneProject_v01/Build/
+
+# Visual Studio related files
+CapstoneProject_v01/.vs/
+CapstoneProject_v01/.vscode/
+CapstoneProject_v01/*.vsconfig
+CapstoneProject_v01/*.sdf
+CapstoneProject_v01/*.sln
+CapstoneProject_v01/*.suo
+
+# Database files
+CapstoneProject_v01/*.db
+CapstoneProject_v01/*.opensdf
+CapstoneProject_v01/*.opendb
+
+# Log and user files
+CapstoneProject_v01/*.log
+CapstoneProject_v01/*.user
+CapstoneProject_v01/*.userprefs
+
+# Temporary and backup files
+CapstoneProject_v01/*.tmp
+CapstoneProject_v01/*.bak
+CapstoneProject_v01/*.swp
+
+# OS system files
+.DS_Store
+Thumbs.db
