@@ -1,0 +1,5 @@
+Success.
+Index:
+assets/model/yoojin.index.
+Time:
+npy: 0.09s, f0: 0.68s, infer: 0.45s.
