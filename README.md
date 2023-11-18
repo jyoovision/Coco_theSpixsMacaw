@@ -7,7 +7,7 @@ The RVC-project can be found [here](https://github.com/RVC-Project).
 ## Installation and Running
 Follow these steps to set up the project on your local machine:
 
-### 1. Clone the Repository<br>
+### 1. Clone the Repository
 Begin by cloning the repository and local files to your system.
 
 ``` bash
