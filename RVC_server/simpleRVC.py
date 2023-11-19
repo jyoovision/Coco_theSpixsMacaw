@@ -1,29 +1,11 @@
 import os
+import asyncio
 import aiofiles
 from io import BytesIO
-from dotenv import load_dotenv
 from pydub import AudioSegment
-from infer.modules.vc.modules import VC
+from dotenv import load_dotenv
 from configs.config import Config
-
-
-def load_config():
-    """
-    환경 변수 로드 및 구성 설정
-    """
-    load_dotenv()
-    return Config()
-
-
-def setup_vc(config):
-    """
-    지정된 구성으로 음성 변환 모듈 설정
-    """
-    vc = VC(config)
-    sid_value = "yoojin.pth"  # 특정 vc 모델 지정 -> assets/model 파일 내부에 위치시켜야 함
-    protect_value = 0.33
-    vc.get_vc(sid_value, protect_value, protect_value)
-    return vc
+from infer.modules.vc.modules import VC
 
 
 async def process_audio(vc, input_audio_path, output_directory):
@@ -91,18 +73,24 @@ async def save_output(message, audio_data_tuple, output_directory):
     return audio
 
 
-async def RVC():
+async def RVC(vc):
     """
     음성 변환 프로세스를 실행하는 메인 함수
     """
-    config = load_config()
-    vc = setup_vc(config)
     input_audio_path = "../InputOutput/input_audio.wav"
     output_directory = "../InputOutput"
     return await process_audio(vc, input_audio_path, output_directory)
 
 
 if __name__ == "__main__":
-    import asyncio
+    # 환경 변수 로드
+    load_dotenv()
 
-    asyncio.run(RVC())
+    # VC 인스턴스 생성
+    vc = VC(Config())
+    sid_value = "yoojin.pth"
+    protect_value = 0.33
+    vc.get_vc(sid_value, protect_value, protect_value)
+
+    # RVC 함수 비동기 실행
+    asyncio.run(RVC(vc))
