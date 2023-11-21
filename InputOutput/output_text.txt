@@ -2,4 +2,4 @@ Success.
 Index:
 assets/model/yoojin.index.
 Time:
-npy: 0.09s, f0: 2.20s, infer: 0.68s.
+npy: 0.10s, f0: 0.08s, infer: 0.35s.

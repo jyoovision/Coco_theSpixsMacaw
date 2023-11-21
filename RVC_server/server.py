@@ -130,6 +130,7 @@ async def splite_save_to_DB(websocket, audio):
     await websocket.send("GCS save complete")
 
 
+# idle 상태일 때, 랜덤으로 오디오 재생
 async def send_random_word_from_DB(websocket, bucket):
     blobs = list(bucket.list_blobs())  # 버킷의 모든 파일 목록을 가져옵니다.
 
