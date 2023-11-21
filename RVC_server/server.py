@@ -1,5 +1,6 @@
 import os
 import io
+import random
 import asyncio
 import websockets
 from simpleRVC import RVC
@@ -33,15 +34,17 @@ GCS_index = modules.load_index(GCS_index_file_path)
 # 언리얼 클라이언트와 웹소켓 서버 통신
 async def echo(websocket, path):
     async for message in websocket:
-        # 언리얼에서 start RVC 메시지가 오면 출력
+        # 언리얼에서 메시지가 오면 출력
         print(f"Received message from client: {message}")
 
-        # start RVC 메시지가 들어오면 is_rvc_running을 검사하여 RVC 수행
+        # start RVC 메시지가 오면 is_rvc_running을 검사하여 RVC 수행
         if message == "start RVC":
+            # RVC start 보내기, RVC 함수 실행하기 작업 병렬 수행
             send_start_task = asyncio.create_task(websocket.send("RVC start"))
             rvc_task = asyncio.create_task(RVC(vc))
             _, audio = await asyncio.gather(send_start_task, rvc_task)
 
+            # RVC complete 보내기, 마지막 단어를 추출하여 보내기, 각각의 단어 DB에 저장하기 병렬 수행
             send_complete_task = asyncio.create_task(websocket.send("RVC complete"))
             extract_send_last_word_task = asyncio.create_task(
                 extract_send_last_word(websocket, audio)
@@ -53,6 +56,9 @@ async def echo(websocket, path):
                 send_complete_task, extract_send_last_word_task, splite_save_to_DB_task
             )
 
+        # idle 메시지가 오면 DB에서 랜덤으로 보내기
+        elif message == "idle":
+            await send_random_word_from_DB(websocket, bucket)
         # 다른 메시지가 들어오면 처리
         else:
             await websocket.send("To start RVC, send 'start RVC'.")
@@ -122,6 +128,19 @@ async def splite_save_to_DB(websocket, audio):
 
     print("GCS save complete")
     await websocket.send("GCS save complete")
+
+
+async def send_random_word_from_DB(websocket, bucket):
+    blobs = list(bucket.list_blobs())  # 버킷의 모든 파일 목록을 가져옵니다.
+
+    if not blobs:
+        return None  # 파일이 없는 경우
+
+    random_blob = random.choice(blobs)  # 랜덤으로 하나의 파일을 선택합니다.
+    random_word_binary = random_blob.download_as_bytes()
+
+    await websocket.send(b"BINARY" + random_word_binary)
+    await websocket.send("Successfully sending random_word_binary data")
 
 
 # 메인 함수
