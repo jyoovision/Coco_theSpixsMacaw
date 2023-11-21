@@ -1,8 +1,8 @@
 import os
+import io
 import struct
 import asyncio
 import websockets
-from io import BytesIO
 from simpleRVC import RVC
 from dotenv import load_dotenv
 from configs.config import Config
@@ -10,22 +10,40 @@ from pydub import AudioSegment, silence
 from infer.modules.vc.modules import VC
 from concurrent.futures import ThreadPoolExecutor
 from google.cloud import storage
+from google.cloud import speech
 
-# from google.cloud import speech
-# from google.cloud.speech import enums
-# from google.cloud.speech import types
-# from google.oauth2 import service_account
 
-# Init/초기 설정
+# 초기 설정
 load_dotenv()
 vc = VC(Config())
 sid_value = "yoojin.pth"
 protect_value = 0.33
 vc.get_vc(sid_value, protect_value, protect_value)
 
+# 구글 클라이언트 설정
 google_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 storage_client = storage.Client()
+speech_client = speech.SpeechClient()
+
+# 구글 클라우드 스토리지 설정
 bucket = storage_client.bucket("audio_segments")
+GCS_index_file = "GCS_index.txt"
+
+
+def load_index():
+    try:
+        with open(GCS_index_file, "r") as file:
+            return int(file.read().strip())
+    except FileNotFoundError:
+        return 0
+
+
+def save_index(index):
+    with open(GCS_index_file, "w") as file:
+        file.write(str(index))
+
+
+GCS_index = load_index()
 
 
 # 언리얼 클라이언트와 웹소켓 서버 통신
@@ -80,7 +98,7 @@ async def extract_send_last_word(websocket, audio):
         return None
 
     # 추출된 구간을 바이너리 데이터로 변환
-    with BytesIO() as buffer:
+    with io.BytesIO() as buffer:
         specific_part.export(buffer, format="wav")
         last_word_binary = buffer.getvalue()
 
@@ -91,15 +109,38 @@ async def extract_send_last_word(websocket, audio):
     await websocket.send("Successfully sending binary data")
 
 
+# google stt로 음성을 텍스트로 바꿔 반환하는 함수
+def SST(segment):
+    # 버퍼에서 오디오 데이터 읽기
+    audio = speech.RecognitionAudio(content=segment)
+
+    # 음성 인식 설정
+    config = speech.RecognitionConfig(
+        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+        sample_rate_hertz=48000,
+        language_code="ko-KR",
+    )
+
+    # 구글 클라우드 스피치 API 호출
+    response = speech_client.recognize(config=config, audio=audio)
+
+    # 결과들을 텍스트로 결합
+    transcripts = [result.alternatives[0].transcript for result in response.results]
+    combined_transcript = " ".join(transcripts)
+
+    return combined_transcript
+
+
 # 세그먼트를 구글 클라우드 스토리지에 저장하는 함수
-def save_segment_to_gcs(segment, segment_number):
-    # 메모리 상의 BytesIO 스트림에 세그먼트 저장
-    buffer = BytesIO()
+def save_segment_to_gcs(segment, GCS_index):
+    # 메모리 상의 io.BytesIO 스트림에 세그먼트 저장
+    buffer = io.BytesIO()
     segment.export(buffer, format="wav")
+    SST_result = SST(buffer.getvalue())
     buffer.seek(0)  # 스트림을 처음으로 되돌림
 
     # 파일명 생성 (예: segment_1.wav)
-    segment_name = f"segment_{segment_number}.wav"
+    segment_name = f"{GCS_index}_{SST_result}.wav"
 
     # 구글 클라우드 스토리지에 업로드
     blob = bucket.blob(segment_name)
@@ -107,27 +148,28 @@ def save_segment_to_gcs(segment, segment_number):
 
     # 필요한 경우, 데이터베이스에 세그먼트 정보 저장
     # 예: database.save(segment_info)
-
-    return f"{segment_name} uploaded to GCS"
+    return
 
 
 # 오디오 세그먼트를 병렬로 저장하는 함수
 async def splite_save_to_DB(websocket, audio):
+    global GCS_index
     segments = silence.split_on_silence(
         audio, min_silence_len=200, silence_thresh=audio.dBFS - 25
     )
 
     loop = asyncio.get_running_loop()
-
     # ThreadPoolExecutor를 사용하여 세그먼트 저장 작업을 병렬로 수행
     with ThreadPoolExecutor() as executor:
         tasks = [
-            loop.run_in_executor(executor, save_segment_to_gcs, segment, i)
+            loop.run_in_executor(executor, save_segment_to_gcs, segment, GCS_index)
             for i, segment in enumerate(segments)
         ]
 
         # 모든 작업이 완료될 때까지 기다림
         await asyncio.gather(*tasks)
+        GCS_index += 1
+        save_index(GCS_index)
 
     print("GCS save complete")
     await websocket.send("GCS save complete")
