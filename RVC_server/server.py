@@ -1,17 +1,16 @@
 import os
 import io
-import struct
 import asyncio
 import websockets
 from simpleRVC import RVC
 from dotenv import load_dotenv
 from configs.config import Config
-from pydub import AudioSegment, silence
+from pydub import silence
 from infer.modules.vc.modules import VC
 from concurrent.futures import ThreadPoolExecutor
 from google.cloud import storage
 from google.cloud import speech
-
+from server_utils import modules, process
 
 # 초기 설정
 load_dotenv()
@@ -20,30 +19,15 @@ sid_value = "yoojin.pth"
 protect_value = 0.33
 vc.get_vc(sid_value, protect_value, protect_value)
 
-# 구글 클라이언트 설정
+# GCS, STT 클라이언트 설정
 google_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 storage_client = storage.Client()
 speech_client = speech.SpeechClient()
 
-# 구글 클라우드 스토리지 설정
+# GCS 초기 설정
 bucket = storage_client.bucket("audio_segments")
-GCS_index_file = "GCS_index.txt"
-
-
-def load_index():
-    try:
-        with open(GCS_index_file, "r") as file:
-            return int(file.read().strip())
-    except FileNotFoundError:
-        return 0
-
-
-def save_index(index):
-    with open(GCS_index_file, "w") as file:
-        file.write(str(index))
-
-
-GCS_index = load_index()
+GCS_index_file_path = os.getenv("GCS_index")
+GCS_index = modules.load_index(GCS_index_file_path)
 
 
 # 언리얼 클라이언트와 웹소켓 서버 통신
@@ -103,52 +87,10 @@ async def extract_send_last_word(websocket, audio):
         last_word_binary = buffer.getvalue()
 
     # 클라이언트로 last_word_binary 전송
-    # verify_wav_format(last_word_binary)
+    # modules.verify_wav_format(last_word_binary)
     print(f"Sending audio binary of size: {len(last_word_binary)} bytes")
     await websocket.send(b"BINARY" + last_word_binary)
     await websocket.send("Successfully sending binary data")
-
-
-# google stt로 음성을 텍스트로 바꿔 반환하는 함수
-def SST(segment):
-    # 버퍼에서 오디오 데이터 읽기
-    audio = speech.RecognitionAudio(content=segment)
-
-    # 음성 인식 설정
-    config = speech.RecognitionConfig(
-        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-        sample_rate_hertz=48000,
-        language_code="ko-KR",
-    )
-
-    # 구글 클라우드 스피치 API 호출
-    response = speech_client.recognize(config=config, audio=audio)
-
-    # 결과들을 텍스트로 결합
-    transcripts = [result.alternatives[0].transcript for result in response.results]
-    combined_transcript = " ".join(transcripts)
-
-    return combined_transcript
-
-
-# 세그먼트를 구글 클라우드 스토리지에 저장하는 함수
-def save_segment_to_gcs(segment, GCS_index):
-    # 메모리 상의 io.BytesIO 스트림에 세그먼트 저장
-    buffer = io.BytesIO()
-    segment.export(buffer, format="wav")
-    SST_result = SST(buffer.getvalue())
-    buffer.seek(0)  # 스트림을 처음으로 되돌림
-
-    # 파일명 생성 (예: segment_1.wav)
-    segment_name = f"{GCS_index}_{SST_result}.wav"
-
-    # 구글 클라우드 스토리지에 업로드
-    blob = bucket.blob(segment_name)
-    blob.upload_from_file(buffer, content_type="audio/wav")
-
-    # 필요한 경우, 데이터베이스에 세그먼트 정보 저장
-    # 예: database.save(segment_info)
-    return
 
 
 # 오디오 세그먼트를 병렬로 저장하는 함수
@@ -162,56 +104,24 @@ async def splite_save_to_DB(websocket, audio):
     # ThreadPoolExecutor를 사용하여 세그먼트 저장 작업을 병렬로 수행
     with ThreadPoolExecutor() as executor:
         tasks = [
-            loop.run_in_executor(executor, save_segment_to_gcs, segment, GCS_index)
+            loop.run_in_executor(
+                executor,
+                process.save_segment_to_gcs,
+                bucket,
+                speech_client,
+                segment,
+                GCS_index,
+            )
             for i, segment in enumerate(segments)
         ]
 
         # 모든 작업이 완료될 때까지 기다림
         await asyncio.gather(*tasks)
         GCS_index += 1
-        save_index(GCS_index)
+        modules.save_index(GCS_index_file_path, GCS_index)
 
     print("GCS save complete")
     await websocket.send("GCS save complete")
-
-
-def verify_wav_format(audio_binary):
-    # 헤더 읽기 (RIFF 헤더는 일반적으로 44바이트)
-    header = audio_binary[:44]
-
-    # RIFF 헤더 구조에 따라 데이터 구조화
-    unpacked_data = struct.unpack("<4sL4s4sLHHLLHH4sL", header)
-
-    # 헤더 정보 추출 및 출력
-    (
-        chunk_id,
-        chunk_size,
-        format,
-        sub_chunk1_id,
-        sub_chunk1_size,
-        audio_format,
-        num_channels,
-        sample_rate,
-        byte_rate,
-        block_align,
-        bits_per_sample,
-        sub_chunk2_id,
-        sub_chunk2_size,
-    ) = unpacked_data
-
-    print(f"ChunkID: {chunk_id.decode().strip()}")
-    print(f"Chunk Size: {chunk_size}")
-    print(f"Format: {format.decode().strip()}")
-    print(f"Sub-chunk1 ID: {sub_chunk1_id.decode().strip()}")
-    print(f"Sub-chunk1 Size: {sub_chunk1_size}")
-    print(f"Audio Format: {audio_format}")
-    print(f"Num Channels: {num_channels}")
-    print(f"Sample Rate: {sample_rate}")
-    print(f"Byte Rate: {byte_rate}")
-    print(f"Block Align: {block_align}")
-    print(f"Bits Per Sample: {bits_per_sample}")
-    print(f"Sub-chunk2 ID: {sub_chunk2_id.decode().strip()}")
-    print(f"Sub-chunk2 Size: {sub_chunk2_size}")
 
 
 # 메인 함수
