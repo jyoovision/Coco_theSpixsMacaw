@@ -13,16 +13,12 @@ from google.cloud import storage
 from google.cloud import speech
 from server_utils import modules, process
 
-from handtracker import HandTracker
+# from handtracker import HandTracker
+# def greeting_detected_callback():
+#     print("Greeting Detected")
+#     # 여기에 언리얼 클라이언트에 메시지를 보내는 로직 추가
+# hand_tracker = HandTracker(greeting_detected_callback)
 
-
-def greeting_detected_callback():
-    print("Greeting Detected")
-    # 여기에 언리얼 클라이언트에 메시지를 보내는 로직 추가
-
-
-hand_tracker = HandTracker(greeting_detected_callback)
-# hand_tracker.start()
 
 # 초기 설정
 load_dotenv()
@@ -163,7 +159,7 @@ async def main():
 
     # 서버가 시작된 것을 콘솔에 로깅
     print(f"Server started on {server.sockets[0].getsockname()}")
-    hand_tracker.start()
+    # hand_tracker.start()
     await server.wait_closed()  # 서버가 닫힐 때까지 기다림
 
 

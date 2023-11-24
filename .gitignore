@@ -3,35 +3,39 @@ __pycache__
 /TEMP
 RVC_server/capstoneproject-405204-aeb7e6f83b1b.json
 
+# Previous version
+CapstoneProject_v01/
+!CapstoneProject_v01.zip
+
 # Unreal Engine 5
-CapstoneProject_v01/Binaries/
-CapstoneProject_v01/DerivedDataCache/
-CapstoneProject_v01/Intermediate/
-CapstoneProject_v01/Saved/
-CapstoneProject_v01/Build/
+CapstoneProject_v02/Binaries/
+CapstoneProject_v02/DerivedDataCache/
+CapstoneProject_v02/Intermediate/
+CapstoneProject_v02/Saved/
+CapstoneProject_v02/Build/
 
 # Visual Studio related files
-CapstoneProject_v01/.vs/
-CapstoneProject_v01/.vscode/
-CapstoneProject_v01/*.vsconfig
-CapstoneProject_v01/*.sdf
-CapstoneProject_v01/*.sln
-CapstoneProject_v01/*.suo
+CapstoneProject_v02/.vs/
+CapstoneProject_v02/.vscode/
+CapstoneProject_v02/*.vsconfig
+CapstoneProject_v02/*.sdf
+CapstoneProject_v02/*.sln
+CapstoneProject_v02/*.suo
 
 # Database files
-CapstoneProject_v01/*.db
-CapstoneProject_v01/*.opensdf
-CapstoneProject_v01/*.opendb
+CapstoneProject_v02/*.db
+CapstoneProject_v02/*.opensdf
+CapstoneProject_v02/*.opendb
 
 # Log and user files
-CapstoneProject_v01/*.log
-CapstoneProject_v01/*.user
-CapstoneProject_v01/*.userprefs
+CapstoneProject_v02/*.log
+CapstoneProject_v02/*.user
+CapstoneProject_v02/*.userprefs
 
 # Temporary and backup files
-CapstoneProject_v01/*.tmp
-CapstoneProject_v01/*.bak
-CapstoneProject_v01/*.swp
+CapstoneProject_v02/*.tmp
+CapstoneProject_v02/*.bak
+CapstoneProject_v02/*.swp
 
 # OS system files
 .DS_Store

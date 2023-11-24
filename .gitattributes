@@ -3,4 +3,6 @@ RVC_server/ffmpeg.exe filter=lfs diff=lfs merge=lfs -text
 RVC_server/assets/** filter=lfs diff=lfs merge=lfs -text
 
 # Unreal Project file tracked by Git LFS
+versions/** filter=lfs diff=lfs merge=lfs -text
 CapstoneProject_v01/** filter=lfs diff=lfs merge=lfs -text
+CapstoneProject_v02/** filter=lfs diff=lfs merge=lfs -text
