@@ -23,7 +23,7 @@ from server_utils import modules, process
 # 초기 설정
 load_dotenv()
 vc = VC(Config())
-sid_value = "parrot_v01.pth"
+sid_value = "parrot.pth"
 protect_value = 0.33
 vc.get_vc(sid_value, protect_value, protect_value)
 

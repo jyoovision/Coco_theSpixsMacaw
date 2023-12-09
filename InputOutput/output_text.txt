@@ -1,5 +1,5 @@
 Success.
 Index:
-assets/model/parrot_v01.index.
+assets/model/parrot.index.
 Time:
-npy: 0.08s, f0: 0.13s, infer: 0.46s.
+npy: 0.11s, f0: 0.11s, infer: 0.44s.

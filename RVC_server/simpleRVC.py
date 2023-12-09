@@ -16,12 +16,12 @@ async def process_audio(vc, input_audio_path, output_directory):
         result = vc.vc_single(
             0,  # spk_item_value (서랍장의 인덱스)
             input_audio_path,  # input_audio0_value
-            1.0,  # vc_transform0_value 피치 값 조절 (-12 ~ 12)
+            5.0,  # vc_transform0_value 피치 값 조절 (-12 ~ 12)
             None,  # f0_file_value
             "rmvpe",  # f0method0_value (방법 선택 "hurbert" 등이 있음)
             "",  # file_index1_value
             # "assets/model/yoojin.index",  # file_index2_value (특정 vc 모델의 인덱스 경로 지정)
-            "assets/model/parrot_v01.index",  # file_index2_value (특정 vc 모델의 인덱스 경로 지정)
+            "assets/model/parrot.index",  # file_index2_value (특정 vc 모델의 인덱스 경로 지정)
             0.75,  # index_rate1_value
             3,  # filter_radius0_value
             0,  # resample_sr0_value
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     # VC 인스턴스 생성
     vc = VC(Config())
     # sid_value = "yoojin.pth"
-    sid_value = "parrot_v01.pth"
+    sid_value = "parrot.pth"
     protect_value = 0.33
     vc.get_vc(sid_value, protect_value, protect_value)
 
