@@ -34,7 +34,7 @@ def save_segment_to_gcs(bucket, speech_client, segment, GCS_index):
     buffer.seek(0)  # 스트림을 처음으로 되돌림
 
     # 파일명 생성 (예: segment_1.wav)
-    segment_name = f"{GCS_index}_{SST_result}.wav"
+    segment_name = f"{GCS_index}_{SST_result}"
 
     # 구글 클라우드 스토리지에 업로드
     blob = bucket.blob(segment_name)
