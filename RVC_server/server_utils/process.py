@@ -1,5 +1,4 @@
 import io
-from pydub import silence
 from google.cloud import speech
 
 

@@ -105,9 +105,9 @@ class HandTracker:
                             self.prev_hello_features_positions[tip] = current_x
 
                         if (
-                            self.movement_count >= 30
-                            and self.movement_left_count >= 10
-                            and self.movement_right_count >= 10
+                            self.movement_count >= 20
+                            and self.movement_left_count >= 7
+                            and self.movement_right_count >= 7
                         ):
                             asyncio.run_coroutine_threadsafe(
                                 self.send_greeting_message(), self.loop

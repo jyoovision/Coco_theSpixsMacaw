@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
-from google.cloud import storage
-from google.cloud import firestore
+from google.cloud import firestore, storage
 
 load_dotenv()
 google_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -38,7 +37,7 @@ def add_audio_url_to_firestore(collection_name, document_id, audio_url):
 gcs_url = upload_to_gcs(
     bucket_name="response_segments",
     source_file_name="../InputOutput/output_audio.wav",
-    destination_blob_name="안녕",
+    destination_blob_name="만나서반가워",
 )
 
 add_audio_url_to_firestore(
