@@ -6,7 +6,7 @@
 # from simpleRVC import RVC
 # from dotenv import load_dotenv
 # from configs.config import Config
-# from pydub import silence
+# from pydub import AudioSegment, silence
 # from infer.modules.vc.modules import VC
 # from concurrent.futures import ThreadPoolExecutor
 # from google.cloud import storage, speech, firestore
@@ -27,7 +27,7 @@
 #     path,
 #     vc,
 #     speech_client,
-#     input_bucket,
+#     output_bucket,
 #     response_bucket,
 #     firestore_client,
 #     GCS_index_file_path,
@@ -44,37 +44,65 @@
 
 #             # start RVC 메시지가 오면 is_rvc_running을 검사하여 RVC 수행
 #             if message == "start RVC":
-#                 # RVC start 보내기, RVC 함수 실행하기 작업 병렬 수행
 #                 send_start_task = asyncio.create_task(websocket.send("RVC start"))
-
-#                 word_serch_task = asyncio.create_task(has_target_words())
-
-#                 rvc_task = asyncio.create_task(RVC(vc))
-#                 _, audio = await asyncio.gather(send_start_task, rvc_task)
-
-#                 # RVC complete 보내기, 마지막 단어를 추출하여 보내기, 각각의 단어 DB에 저장하기 병렬 수행
-#                 send_complete_task = asyncio.create_task(websocket.send("RVC complete"))
-#                 extract_send_last_word_task = asyncio.create_task(
-#                     extract_send_last_word(websocket, audio)
+#                 search_target_words_task = asyncio.create_task(
+#                     search_target_words(speech_client, "손인사")
 #                 )
-#                 splite_save_to_DB_task = asyncio.create_task(
-#                     splite_save_to_DB(
-#                         websocket,
-#                         audio,
-#                         input_bucket,
-#                         speech_client,
-#                         GCS_index_file_path,
+#                 # RVC start 보내기, 문장에서 타겟 단어 찾기, RVC 수행 병렬 처리
+#                 rvc_task = asyncio.create_task(RVC(vc))
+#                 (
+#                     _,
+#                     (has_target, target_word),
+#                     (input_audio, output_audio),
+#                 ) = await asyncio.gather(
+#                     send_start_task, search_target_words_task, rvc_task
+#                 )
+
+#                 print(has_target, target_word)
+
+#                 # 병렬로 실행할 작업 리스트
+#                 tasks = [asyncio.create_task(websocket.send("RVC complete"))]
+
+#                 if has_target:
+#                     # has_target이 True일 때 응답 버킷에서 랜덤 전송
+#                     tasks.append(
+#                         asyncio.create_task(
+#                             send_random_response_of(
+#                                 websocket,
+#                                 firestore_client,
+#                                 response_bucket,
+#                                 target_word,
+#                             )
+#                         )
+#                     )
+#                 else:
+#                     # has_target이 False일 때 마지막 단어를 추출하여 전송
+#                     tasks.append(
+#                         asyncio.create_task(
+#                             extract_send_last_word(websocket, output_audio)
+#                         )
+#                     )
+
+#                 # 문장에서 조용한 부분으로 잘라 아웃풋 버킷에 저장
+#                 tasks.append(
+#                     asyncio.create_task(
+#                         splite_save_to_DB(
+#                             websocket,
+#                             input_audio,
+#                             output_audio,
+#                             output_bucket,
+#                             speech_client,
+#                             GCS_index_file_path,
+#                         )
 #                     )
 #                 )
-#                 await asyncio.gather(
-#                     send_complete_task,
-#                     extract_send_last_word_task,
-#                     splite_save_to_DB_task,
-#                 )
+
+#                 # 모든 선택된 작업을 병렬로 실행
+#                 await asyncio.gather(*tasks)
 
 #             # idle 메시지가 오면 DB에서 랜덤으로 보내기
 #             elif message == "idle":
-#                 await send_random_word_from_DB(websocket, input_bucket)
+#                 await send_random_word_from_DB(websocket, output_bucket)
 
 #             # Greeting Detected 메시지가 오면 언리얼로 메시지 전송
 #             elif message == "Greeting Detected":
@@ -109,10 +137,37 @@
 #                 break
 
 
-# async def has_target_words(
+# # 오디오에서 단어 검색
+# async def search_target_words(speech_client, target_keywords):
+#     # WAV 파일을 불러오기
+#     audio = AudioSegment.from_wav("../InputOutput/input_audio.wav")
 
+#     # 오디오를 모노 채널로 변환
+#     mono_audio = audio.set_channels(1)
 
-# )
+#     # 변환된 오디오를 바이너리 데이터로 변환
+#     buffer = io.BytesIO()
+#     mono_audio.export(buffer, format="wav")
+#     audio_binary = buffer.getvalue()
+
+#     # Google STT 설정
+#     audio = speech.RecognitionAudio(content=audio_binary)
+#     config = speech.RecognitionConfig(
+#         encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+#         language_code="ko-KR",
+#     )
+
+#     # Google STT를 사용하여 오디오를 텍스트로 변환
+#     response = speech_client.recognize(config=config, audio=audio)
+
+#     for result in response.results:
+#         print(result)
+#         transcript = result.alternatives[0].transcript
+#         if target_keywords in transcript:
+#             return True, target_keywords
+
+#     # 키워드가 없는 경우
+#     return False, None
 
 
 # # Firestore에서 문서 ID에 해당하는 오디오 URL 중 하나를 랜덤하게 선택하고, 해당 오디오를 GCS에서 바이너리 데이터로 가져와 클라이언트로 전송
@@ -176,29 +231,49 @@
 
 # # 오디오 세그먼트를 병렬로 저장하는 함수
 # async def splite_save_to_DB(
-#     websocket, audio, input_bucket, speech_client, GCS_index_file_path
+#     websocket,
+#     input_audio,
+#     output_audio,
+#     output_bucket,
+#     speech_client,
+#     GCS_index_file_path,
 # ):
 #     global GCS_index
-#     segments = silence.split_on_silence(
-#         audio, min_silence_len=200, silence_thresh=audio.dBFS - 25
+
+#     # 아웃풋 오디오를 비침묵 세그먼트로 분할하여 시작과 끝 시간을 찾음
+#     non_silent_parts = silence.detect_nonsilent(
+#         output_audio, min_silence_len=200, silence_thresh=output_audio.dBFS - 25
 #     )
 
+#     input_segments = []
+#     output_segments = []
+
+#     for start, end in non_silent_parts:
+#         # 인풋 오디오를 동일한 위치에서 분할
+#         input_segment = input_audio[start:end]
+#         input_segments.append(input_segment)
+
+#         # 아웃풋 오디오도 동일한 위치에서 분할
+#         output_segment = output_audio[start:end]
+#         output_segments.append(output_segment)
+
+#     print(len(input_segments), len(output_segments))
+
 #     loop = asyncio.get_running_loop()
-#     # ThreadPoolExecutor를 사용하여 세그먼트 저장 작업을 병렬로 수행
 #     with ThreadPoolExecutor() as executor:
-#         tasks = [
-#             loop.run_in_executor(
+#         tasks = []
+#         for input_segment, output_segment in zip(input_segments, output_segments):
+#             task = loop.run_in_executor(
 #                 executor,
 #                 process.save_segment_to_gcs,
-#                 input_bucket,
+#                 output_bucket,
 #                 speech_client,
-#                 segment,
+#                 input_segment,
+#                 output_segment,
 #                 GCS_index,
 #             )
-#             for i, segment in enumerate(segments)
-#         ]
+#             tasks.append(task)
 
-#         # 모든 작업이 완료될 때까지 기다림
 #         await asyncio.gather(*tasks)
 #         GCS_index += 1
 #         modules.save_index(GCS_index_file_path, GCS_index)
@@ -208,8 +283,8 @@
 
 
 # # idle 상태일 때, 랜덤으로 오디오 재생
-# async def send_random_word_from_DB(websocket, input_bucket):
-#     blobs = list(input_bucket.list_blobs())  # 버킷의 모든 파일 목록을 가져옵니다.
+# async def send_random_word_from_DB(websocket, output_bucket):
+#     blobs = list(output_bucket.list_blobs())  # 버킷의 모든 파일 목록을 가져옵니다.
 
 #     if not blobs:
 #         return None  # 파일이 없는 경우
@@ -236,7 +311,7 @@
 #     speech_client = speech.SpeechClient()
 #     firestore_client = firestore.Client()
 
-#     input_bucket = storage_client.bucket("input_segments")
+#     output_bucket = storage_client.bucket("output_segments")
 #     response_bucket = storage_client.bucket("response_segments")
 #     GCS_index_file_path = os.getenv("GCS_index")
 #     GCS_index = modules.load_index(GCS_index_file_path)
@@ -244,7 +319,7 @@
 #     return (
 #         vc,
 #         speech_client,
-#         input_bucket,
+#         output_bucket,
 #         response_bucket,
 #         firestore_client,
 #         GCS_index_file_path,
@@ -257,7 +332,7 @@
 #     (
 #         vc,
 #         speech_client,
-#         input_bucket,
+#         output_bucket,
 #         response_bucket,
 #         firestore_client,
 #         GCS_index_file_path,
@@ -270,7 +345,7 @@
 #             path,
 #             vc,
 #             speech_client,
-#             input_bucket,
+#             output_bucket,
 #             response_bucket,
 #             firestore_client,
 #             GCS_index_file_path,
@@ -297,13 +372,14 @@
 
 import os
 import io
+import re
 import random
 import asyncio
 import websockets
 from simpleRVC import RVC
 from dotenv import load_dotenv
 from configs.config import Config
-from pydub import silence
+from pydub import AudioSegment, silence
 from infer.modules.vc.modules import VC
 from concurrent.futures import ThreadPoolExecutor
 from google.cloud import storage, speech, firestore
@@ -336,49 +412,30 @@ async def echo(
 
     try:
         async for message in websocket:
-            # 메시지가 수신되면 출력
+            # 메시지가 수신되면 어떤 메시지인지 출력
             print(f"Received message from client: {message}")
 
-            # start RVC 메시지가 오면 is_rvc_running을 검사하여 RVC 수행
             if message == "start RVC":
-                # RVC start 보내기, 문장에서 타겟 단어 찾기, RVC 수행 병렬 처리
                 send_start_task = asyncio.create_task(websocket.send("RVC start"))
-                search_target_words_task = asyncio.create_task(search_target_words())
-                rvc_task = asyncio.create_task(RVC(vc))
-                (
-                    _,
-                    (has_target, target_word),
-                    (input_audio, output_audio),
-                ) = await asyncio.gather(
-                    send_start_task, search_target_words_task, rvc_task
+                search_keywords_task = asyncio.create_task(
+                    search_keywords(
+                        websocket, speech_client, firestore_client, response_bucket
+                    )
                 )
+                rvc_task = asyncio.create_task(RVC(vc))
 
-                # 병렬로 실행할 작업 리스트
-                tasks = [asyncio.create_task(websocket.send("RVC complete"))]
+                _, has_keyword, (input_audio, output_audio) = await asyncio.gather(
+                    send_start_task, search_keywords_task, rvc_task
+                )
+                # 작업이 끝나면, 메시지 보내기
+                await websocket.send(f"RVC complete")
 
-                if has_target:
-                    # has_target이 True일 때 응답 버킷에서 랜덤 전송
-                    tasks.append(
-                        asyncio.create_task(
-                            send_random_response_of(
-                                websocket,
-                                firestore_client,
-                                response_bucket,
-                                target_word,
-                            )
-                        )
+                if has_keyword == False:
+                    # 키워드가 발견되지 않았을 경우 마지막 단어를 보내고, 데이터베이스에 저장
+                    extract_send_last_word_task = asyncio.create_task(
+                        extract_send_last_word(websocket, output_audio)
                     )
-                else:
-                    # has_target이 False일 때 마지막 단어를 추출하여 전송
-                    tasks.append(
-                        asyncio.create_task(
-                            extract_send_last_word(websocket, output_audio)
-                        )
-                    )
-
-                # 문장에서 조용한 부분으로 잘라 아웃풋 버킷에 저장
-                tasks.append(
-                    asyncio.create_task(
+                    splite_save_to_DB_task = asyncio.create_task(
                         splite_save_to_DB(
                             websocket,
                             input_audio,
@@ -388,10 +445,9 @@ async def echo(
                             GCS_index_file_path,
                         )
                     )
-                )
-
-                # 모든 선택된 작업을 병렬로 실행
-                await asyncio.gather(*tasks)
+                    await asyncio.gather(
+                        extract_send_last_word_task, splite_save_to_DB_task
+                    )
 
             # idle 메시지가 오면 DB에서 랜덤으로 보내기
             elif message == "idle":
@@ -430,8 +486,73 @@ async def echo(
                 break
 
 
-async def search_target_words():
-    return False, None
+def search_keyword(speech_client, audio_binary, keyword):
+    # 오디오를 바이너리 형식으로 전송하기 위한 준비
+    audio = speech.RecognitionAudio(content=audio_binary)
+
+    # 설정: 언어 코드, 샘플 레이트 등
+    config = speech.RecognitionConfig(
+        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+        sample_rate_hertz=48000,
+        language_code="ko-KR",  # Korean language
+        enable_automatic_punctuation=True,
+    )
+
+    # API 호출
+    response = speech_client.recognize(config=config, audio=audio)
+
+    # 응답 처리
+    for result in response.results:
+        # 변환된 텍스트에서 키워드 검색
+        if re.search(keyword, result.alternatives[0].transcript.replace(" ", "")):
+            print("발견")
+            return keyword
+
+    return False
+
+
+import random
+
+
+async def search_keywords(websocket, speech_client, firestore_client, response_bucket):
+    # WAV 파일을 불러오기
+    input_audio = AudioSegment.from_wav("../InputOutput/input_audio.wav").set_channels(
+        1
+    )
+
+    # 변환된 오디오를 바이너리 데이터로 변환
+    buffer = io.BytesIO()
+    input_audio.export(buffer, format="wav")
+    audio_binary = buffer.getvalue()
+
+    # 검색할 키워드
+    keywords = ["안녕", "이름", "뭐해"]
+
+    # 현재 실행 중인 이벤트 루프 가져오기
+    loop = asyncio.get_running_loop()
+
+    # 병렬 검색 작업 설정
+    search_tasks = [
+        loop.run_in_executor(None, search_keyword, speech_client, audio_binary, keyword)
+        for keyword in keywords
+    ]
+
+    # 모든 태스크가 완료되기를 기다림
+    results = await asyncio.gather(*search_tasks)
+
+    # 검색된 키워드 중 하나를 무작위로 선택
+    found_keywords = [result for result in results if result is not False]
+    if found_keywords:
+        selected_keyword = random.choice(found_keywords)
+        await send_random_response_of(
+            websocket,
+            firestore_client,
+            response_bucket,
+            selected_keyword,
+        )
+        return True
+
+    return False
 
 
 # Firestore에서 문서 ID에 해당하는 오디오 URL 중 하나를 랜덤하게 선택하고, 해당 오디오를 GCS에서 바이너리 데이터로 가져와 클라이언트로 전송
@@ -520,8 +641,6 @@ async def splite_save_to_DB(
         # 아웃풋 오디오도 동일한 위치에서 분할
         output_segment = output_audio[start:end]
         output_segments.append(output_segment)
-
-    print(len(input_segments), len(output_segments))
 
     loop = asyncio.get_running_loop()
     with ThreadPoolExecutor() as executor:

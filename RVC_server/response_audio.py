@@ -37,9 +37,9 @@ def add_audio_url_to_firestore(collection_name, document_id, audio_url):
 gcs_url = upload_to_gcs(
     bucket_name="response_segments",
     source_file_name="../InputOutput/output_audio.wav",
-    destination_blob_name="만나서반가워",
+    destination_blob_name="앉아있어",
 )
 
 add_audio_url_to_firestore(
-    collection_name="response_segments", document_id="손인사", audio_url=gcs_url
+    collection_name="response_segments", document_id="뭐해", audio_url=gcs_url
 )
