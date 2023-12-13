@@ -2,4 +2,4 @@ Success.
 Index:
 assets/model/parrot.index.
 Time:
-npy: 0.10s, f0: 0.20s, infer: 0.54s.
+npy: 0.13s, f0: 0.22s, infer: 0.57s.

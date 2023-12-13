@@ -33,13 +33,32 @@ def add_audio_url_to_firestore(collection_name, document_id, audio_url):
         doc_ref.set({"audio_urls": [audio_url]})
 
 
-# 함수 실행 예시
+# # 함수 실행 예시
 gcs_url = upload_to_gcs(
     bucket_name="response_segments",
     source_file_name="../InputOutput/output_audio.wav",
-    destination_blob_name="잘모르겠어",
+    destination_blob_name="휘파람",
 )
 
 add_audio_url_to_firestore(
-    collection_name="response_segments", document_id="신기", audio_url=gcs_url
+    collection_name="response_segments", document_id="좋", audio_url=gcs_url
 )
+
+
+# add_audio_url_to_firestore(
+#     collection_name="response_segments",
+#     document_id="사랑한",
+#     audio_url="gs://response_segments/나도",
+# )
+
+# add_audio_url_to_firestore(
+#     collection_name="response_segments",
+#     document_id="잘한다",
+#     audio_url="gs://response_segments/고마워용",
+# )
+
+# add_audio_url_to_firestore(
+#     collection_name="response_segments",
+#     document_id="잘한다",
+#     audio_url="gs://response_segments/감사합니다",
+# )

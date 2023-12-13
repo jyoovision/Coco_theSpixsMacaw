@@ -80,7 +80,8 @@ async def echo(
 
             # idle 메시지가 오면 DB에서 랜덤으로 보내기
             elif message == "idle":
-                await send_random_word_from_DB(websocket, output_bucket)
+                if isHuman:
+                    await send_random_word_from_DB(websocket, output_bucket)
 
             # Greeting Detected 메시지가 오면 언리얼로 메시지 전송
             elif message == "Greeting Detected":
@@ -178,22 +179,26 @@ async def search_keywords(websocket, speech_client, firestore_client, response_b
 
     # 검색할 키워드
     keywords = [
-        "안녕",
-        "이름",
+        "귀",
+        "노래",
         "누구",
-        "뭐해",
+        "똑똑",
+        "먹",
+        "멋",
         "뭐하고",
         "뭐하는",
-        "노래",
-        "휘파람",
+        "뭐해",
         "비트박스",
-        "똑똑",
-        "천재",
-        "귀",
-        "좋",
-        "먹",
+        "사랑한",
         "사랑해",
+        "안녕",
         "어떻게",
+        "이름",
+        "잘한다",
+        "좋",
+        "천재",
+        "할수",
+        "휘파람",
     ]
 
     # 현재 실행 중인 이벤트 루프 가져오기
