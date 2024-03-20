@@ -1,4 +1,4 @@
-# ArtechCapstoneProject
+# Coco_theSpixsMacaw
 [English](README.md) | [한국어](README-ko.md)  
 
 ## About
